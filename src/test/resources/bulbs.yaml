@@ -1,0 +1,29 @@
+- name: RGBW 001
+  ip: 192.168.0.100
+  mac: xx:xx:xx:xx:xx:xx #not required, useful for matching the ip with the device
+  id: 0123456789abcdef012345
+  key: 0123456789abcdef
+  enabled: true
+  osc:
+    addresses:
+      power: /0/dmx/0
+      brighnes: /0/dmx/1
+      temperature: /0/dmx/2
+      red: /0/dmx/3
+      green: /0/dmx/4
+      blue: /0/dmx/5
+
+- name: RGBW 002
+  ip: 192.168.0.101
+  mac: xx:xx:xx:xx:xx:xx
+  id: 0123456789abcdef012345
+  key: 0123456789abcdef
+  enabled: true
+  osc:
+    addresses:
+      power: /0/dmx/6
+      brighnes: /0/dmx/7
+      temperature: /0/dmx/8
+      red: /0/dmx/9
+      green: /0/dmx/10
+      blue: /0/dmx/11
