@@ -2,6 +2,7 @@ package com.github.matejonnet.osctuya.osc;
 
 import com.github.matejonnet.osctuya.Bulb;
 import com.github.matejonnet.osctuya.config.BulbConfig;
+import com.github.matejonnet.osctuya.config.Config;
 import com.github.matejonnet.osctuya.config.ConfigReader;
 import com.github.matejonnet.osctuya.config.OscAddress;
 import com.illposed.osc.OSCBadDataEvent;
@@ -15,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
@@ -38,12 +38,10 @@ public class OSCApplication extends OSCPortIn {
 
     private final BulbCommandProcessor bulbCommandProcessor = new BulbCommandProcessor();
 
-    public OSCApplication(SocketAddress address, File configFile) throws IOException {
-        super(address);
+    public OSCApplication(Config config) throws IOException {
+        super(new InetSocketAddress(config.bindHost, config.bindPort));
 
-        log.info("Loading config {}.", configFile);
-        List<BulbConfig> bulbConfigs = ConfigReader.getBulbs(configFile);
-        Set<BulbWithAddresses> bulbsWithAddresses = getBulbsWithAddresses(bulbConfigs);
+        Set<BulbWithAddresses> bulbsWithAddresses = getBulbsWithAddresses(config.getBulbs(), config);
 
         Consumer<BulbCommand> onMessage = (bulbCommand) -> {
             if (!commandQueue.offer(bulbCommand)) { //TODO each bulb should have it's own queue
@@ -83,7 +81,7 @@ public class OSCApplication extends OSCPortIn {
         });
     }
 
-    private Set<BulbWithAddresses> getBulbsWithAddresses(List<BulbConfig> bulbConfigs) {
+    private Set<BulbWithAddresses> getBulbsWithAddresses(List<BulbConfig> bulbConfigs, Config config) {
         return bulbConfigs.stream()
                 .filter(bc -> {
                     boolean enabled = bc.getEnabled().isEmpty() || bc.getEnabled().get().equals(true);
@@ -92,13 +90,13 @@ public class OSCApplication extends OSCPortIn {
                     }
                     return enabled;
                 })
-                .map(bc -> getBulbWithAddresses(bc))
+                .map(bc -> getBulbWithAddresses(bc, config))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
-    private BulbWithAddresses getBulbWithAddresses(BulbConfig bc) {
-        Bulb bulb = new Bulb(bc.getIp(), bc.getId(), bc.getKey(), bc.getName());
+    private BulbWithAddresses getBulbWithAddresses(BulbConfig bc, Config config) {
+        Bulb bulb = new Bulb(bc.getIp(), bc.getId(), bc.getKey(), bc.getName(), config);
         BulbWithAddresses bulbWithAddresses = new BulbWithAddresses(bulb);
         OscAddress addresses = bc.getOsc().getAddresses();
 
@@ -120,7 +118,13 @@ public class OSCApplication extends OSCPortIn {
             log.error("Missing arguments: first argument must be a path to the bulbs config.");
             return;
         }
-        new OSCApplication(new InetSocketAddress("127.0.0.1", 7770), new File(configPath));
+
+        File configFile = new File(configPath);
+        log.info("Loading config from {}.", configFile);
+        Config config = ConfigReader.getConfig(configFile);
+
+
+        new OSCApplication(config);
     }
 
     private final class PrintBadDataListener implements OSCBadDataListener {

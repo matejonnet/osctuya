@@ -1,6 +1,7 @@
 package com.github.matejonnet.osctuya;
 
 import com.github.matejonnet.osctuya.config.BulbConfig;
+import com.github.matejonnet.osctuya.config.Config;
 import com.github.matejonnet.osctuya.config.ConfigReader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,10 @@ public class ConfigurationTest {
 
     @Test
     public void shouldReadTheConfig() throws IOException {
-        List<BulbConfig> bulbs = ConfigReader.getBulbs(new File(CommnadsRemoteTest.class.getClassLoader().getResource("bulbs.yaml").getFile()));
+        Config config = ConfigReader.getConfig(new File(CommnadsRemoteTest.class.getClassLoader().getResource("config.yaml").getFile()));
+        Assertions.assertEquals("127.0.0.1", config.getBindHost());
+
+        List<BulbConfig> bulbs = config.getBulbs();
         log.info("toString: {}", bulbs);
         Assertions.assertTrue(bulbs.size() > 0);
     }

@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.matejonnet.osctuya</groupId>
   <artifactId>osctuya</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1-SNAPSHOT</version>
   <description>OSC Tuya bridge.</description>
   <packaging>jar</packaging>
 

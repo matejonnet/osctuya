@@ -1,5 +1,6 @@
 package com.github.matejonnet.osctuya;
 
+import com.github.matejonnet.osctuya.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Bulb implements Closeable {
 
     private static final Logger logger = LoggerFactory.getLogger(Bulb.class);
+    private final boolean alwaysSendPowerOn;
 
     private String ip;
     private final String devId;
@@ -38,11 +40,12 @@ public class Bulb implements Closeable {
     private final AtomicInteger sequence = new AtomicInteger();
     private Color lastColor = new Color(0, 0, 0);
 
-    public Bulb(String ip, String devId, String localKey, String name) {
+    public Bulb(String ip, String devId, String localKey, String name, Config config) {
         this.ip = ip;
         this.devId = devId;
         this.localKey = localKey;
         this.name = name;
+        this.alwaysSendPowerOn = config.alwaysSendPowerOn;
     }
 
     public void connect() throws IOException {
@@ -57,7 +60,7 @@ public class Bulb implements Closeable {
     public void setPower(boolean on) {
         try {
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("20", on));
-            connection.send(byteBuffer);
+            send(byteBuffer, true);
         } catch (PayloadGenerationException | IOException e) {
             logger.error("Cannot set power on bulb: " + name, e);
         }
@@ -70,7 +73,7 @@ public class Bulb implements Closeable {
         try {
             var value = 10 + (1000 - 10) * percentage / 100;
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("22", value));
-            connection.send(byteBuffer);
+            send(byteBuffer);
         } catch (PayloadGenerationException | IOException e) {
             logger.error("Cannot set brightness on bulb: " + name, e);
         }
@@ -86,7 +89,7 @@ public class Bulb implements Closeable {
         }
         try {
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("23", relativeValue));
-            connection.send(byteBuffer);
+            send(byteBuffer);
         } catch (PayloadGenerationException | IOException e) {
             logger.error("Cannot set temperature on bulb: " + name, e);
         }
@@ -101,7 +104,7 @@ public class Bulb implements Closeable {
         command.put("24", colorValue);
         try {
             ByteBuffer colorBuffer = generatePayload(command);
-            connection.send(colorBuffer);
+            send(colorBuffer);
         } catch (PayloadGenerationException | IOException e) {
             logger.error("Cannot set color on bulb: " + name, e);
         }
@@ -121,7 +124,6 @@ public class Bulb implements Closeable {
         Color newColor = new Color(lastColor.getRed(), lastColor.getGreen(), blue);
         setColor(newColor);
     }
-
 
     /**
      * Turn on/off
@@ -199,6 +201,17 @@ public class Bulb implements Closeable {
         tuyaMessage.put(payloadBuffer.capacity() + 16, crc.getValue());
         tuyaMessage.put(payloadBuffer.capacity() + 20, HexFormat.of().parseHex("0000AA55"));
         return tuyaMessage;
+    }
+
+    private void send(ByteBuffer byteBuffer, boolean ignoreAlwaysSendPowerOn) throws IOException {
+        if (alwaysSendPowerOn && !ignoreAlwaysSendPowerOn) {
+            setPower(true);
+        }
+        connection.send(byteBuffer);
+    }
+
+    private void send(ByteBuffer byteBuffer) throws IOException {
+        send(byteBuffer, false);
     }
 
     @Override

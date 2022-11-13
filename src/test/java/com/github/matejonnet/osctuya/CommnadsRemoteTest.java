@@ -1,5 +1,6 @@
 package com.github.matejonnet.osctuya;
 
+import com.github.matejonnet.osctuya.config.Config;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -24,7 +25,8 @@ public class CommnadsRemoteTest {
     @Test
     public void runCommands() throws IOException, InterruptedException {
 
-        Bulb bulb = new Bulb(DEVICE_IP, DEVICE_ID, DEVICE_KEY, DEVICE_IP);
+        Config config = Config.builder().build();
+        Bulb bulb = new Bulb(DEVICE_IP, DEVICE_ID, DEVICE_KEY, DEVICE_IP, config);
         bulb.connect();
 
         bulb.setPower(true);
