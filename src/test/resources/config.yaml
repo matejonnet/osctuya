@@ -1,6 +1,6 @@
 bindHost: 127.0.0.1
 bindPort: 7770
-alwaysSendPowerOn: false
+alwaysSendPower: false
 bulbs:
   - name: RGBW 001
     ip: 192.168.0.100

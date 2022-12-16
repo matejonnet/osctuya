@@ -27,10 +27,6 @@ public class BulbWithAddresses {
         commands.put(address, new CommandMapping(address, command));
     }
 
-    public void putMapping(CommandMapping commandMapping) { //TODO remove ?
-        commands.put(commandMapping.address(), commandMapping);
-    }
-
     public Optional<TuyaCommand> getCommand(String address) {
         CommandMapping commandMapping = commands.get(address);
         if (commandMapping != null) {

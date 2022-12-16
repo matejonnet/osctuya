@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Bulb implements Closeable {
 
     private static final Logger logger = LoggerFactory.getLogger(Bulb.class);
-    private final boolean alwaysSendPowerOn;
+        private final boolean alwaysSendPower;
 
     private String ip;
     private final String devId;
@@ -39,13 +39,14 @@ public class Bulb implements Closeable {
 
     private final AtomicInteger sequence = new AtomicInteger();
     private Color lastColor = new Color(0, 0, 0);
+    private boolean lastPower;
 
     public Bulb(String ip, String devId, String localKey, String name, Config config) {
         this.ip = ip;
         this.devId = devId;
         this.localKey = localKey;
         this.name = name;
-        this.alwaysSendPowerOn = config.alwaysSendPowerOn;
+        this.alwaysSendPower = config.alwaysSendPower;
     }
 
     public void connect() throws IOException {
@@ -59,6 +60,7 @@ public class Bulb implements Closeable {
 
     public void setPower(boolean on) {
         try {
+            lastPower = on;
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("20", on));
             send(byteBuffer, true);
         } catch (PayloadGenerationException | IOException e) {
@@ -203,9 +205,9 @@ public class Bulb implements Closeable {
         return tuyaMessage;
     }
 
-    private void send(ByteBuffer byteBuffer, boolean ignoreAlwaysSendPowerOn) throws IOException {
-        if (alwaysSendPowerOn && !ignoreAlwaysSendPowerOn) {
-            setPower(true);
+    private void send(ByteBuffer byteBuffer, boolean ignoreAlwaysSendPower) throws IOException {
+        if (alwaysSendPower && !ignoreAlwaysSendPower) {
+            setPower(lastPower);
         }
         connection.send(byteBuffer);
     }

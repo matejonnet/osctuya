@@ -17,7 +17,7 @@ public class Config {
      * Sends "power on" before every command.
      * Used to workaround responsiveness issues.
      */
-    public final boolean alwaysSendPowerOn;
+    public final boolean alwaysSendPower;
 
     public final List<BulbConfig> bulbs;
 }

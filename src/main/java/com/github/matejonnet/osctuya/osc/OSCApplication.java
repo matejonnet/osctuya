@@ -20,10 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -33,20 +31,18 @@ import java.util.stream.Collectors;
 public class OSCApplication extends OSCPortIn {
 
     private static final Logger log = LoggerFactory.getLogger(OSCApplication.class);
-    private final BlockingQueue<BulbCommand> commandQueue = new ArrayBlockingQueue<>(1000);
-    private final Executor executor = Executors.newScheduledThreadPool(4);
 
-    private final BulbCommandProcessor bulbCommandProcessor = new BulbCommandProcessor();
+    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
 
     public OSCApplication(Config config) throws IOException {
         super(new InetSocketAddress(config.bindHost, config.bindPort));
 
+        CommandScheduler commandScheduler = new RepeatableExecutorPerBulbCommandScheduler();
+
         Set<BulbWithAddresses> bulbsWithAddresses = getBulbsWithAddresses(config.getBulbs(), config);
 
         Consumer<BulbCommand> onMessage = (bulbCommand) -> {
-            if (!commandQueue.offer(bulbCommand)) { //TODO each bulb should have it's own queue
-                log.warn("Ignoring command, queue is full!");
-            }
+            commandScheduler.submit(bulbCommand);
         };
         OSCMessageListener listener = new TuyaMessageListener(bulbsWithAddresses, onMessage);
         // select all messages
@@ -64,19 +60,6 @@ public class OSCApplication extends OSCPortIn {
                 bulbWithAddresses.getBulb().connect();
             } catch (IOException e) {
                 log.error("Cannot connect bulb {}.", bulbWithAddresses.getBulb().getName());
-            }
-        });
-
-        executor.execute(() -> {
-            while (true) {
-                try {
-                    BulbCommand bulbCommand = commandQueue.take();
-                    bulbCommandProcessor.process(bulbCommand);
-                } catch (InterruptedException e) {
-                    log.error("Interrupted while waiting for new element.", e);
-                } catch (Throwable e) {
-                    log.error("Cannot process command.", e);
-                }
             }
         });
     }
