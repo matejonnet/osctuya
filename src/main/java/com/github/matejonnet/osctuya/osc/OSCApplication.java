@@ -37,7 +37,7 @@ public class OSCApplication extends OSCPortIn {
     public OSCApplication(Config config) throws IOException {
         super(new InetSocketAddress(config.bindHost, config.bindPort));
 
-        CommandScheduler commandScheduler = new RepeatableExecutorPerBulbCommandScheduler();
+        CommandScheduler commandScheduler = new DirectCommandScheduler();
 
         Set<BulbWithAddresses> bulbsWithAddresses = getBulbsWithAddresses(config.getBulbs(), config);
 

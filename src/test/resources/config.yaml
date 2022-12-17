@@ -1,6 +1,10 @@
 bindHost: 127.0.0.1
 bindPort: 7770
 alwaysSendPower: false
+sendQueueSize: 10
+commandTimeoutMillis: 300
+repeatDelayMillis: 300
+repeatCommandTimes: 5
 bulbs:
   - name: RGBW 001
     ip: 192.168.0.100

@@ -46,6 +46,7 @@ public class QueuePerBulbCommandScheduler implements CommandScheduler {
     @Override
     public void submit(BulbCommand bulbCommand) {
         String bulbName = bulbCommand.bulb().getName();
+        // not good to drop old messages as it might be a color change and we lose the data of the individual color
         CircularFifoQueue bulbQueue = bulbQueues.computeIfAbsent(bulbName, (k) -> new CircularFifoQueue<>(10));
         bulbQueue.offer(bulbCommand);
         semaphore.release();

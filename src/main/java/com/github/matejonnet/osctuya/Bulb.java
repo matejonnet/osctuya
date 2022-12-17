@@ -1,6 +1,7 @@
 package com.github.matejonnet.osctuya;
 
 import com.github.matejonnet.osctuya.config.Config;
+import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,7 +10,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
-import java.awt.Color;
+import java.awt.*;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -21,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -29,17 +31,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Bulb implements Closeable {
 
     private static final Logger logger = LoggerFactory.getLogger(Bulb.class);
-        private final boolean alwaysSendPower;
-
+    private final boolean alwaysSendPower;
     private String ip;
     private final String devId;
     private final String localKey;
     private final String name;
     private Connection connection;
-
     private final AtomicInteger sequence = new AtomicInteger();
     private Color lastColor = new Color(0, 0, 0);
     private boolean lastPower;
+    private CircularFifoQueue<Command> sendQueue;
+    private Semaphore semaphore = new Semaphore(0);
+    private final ExecutorService executor = Executors.newScheduledThreadPool(1);
+    private ScheduledExecutorService cancelMonitor = Executors.newScheduledThreadPool(1);
+    private int commandRepeated = 0;
 
     public Bulb(String ip, String devId, String localKey, String name, Config config) {
         this.ip = ip;
@@ -47,6 +52,47 @@ public class Bulb implements Closeable {
         this.localKey = localKey;
         this.name = name;
         this.alwaysSendPower = config.alwaysSendPower;
+
+        sendQueue = new CircularFifoQueue<>(config.sendQueueSize);
+
+        executor.execute(() -> {
+            while (true) {
+                try {
+                    Command command = sendQueue.poll();
+                    if (command != null) {
+                        Future<?> future = executor.submit(() -> {
+                            try {
+                                connection.send(command.byteBuffer());
+                            } catch (IOException e) {
+                                logger.error("Cannot set " + command.message() + " on bulb: " + name, e);
+                            }
+                        });
+                        cancelMonitor.schedule(() -> future.cancel(true), config.commandTimeoutMillis, TimeUnit.MILLISECONDS);
+                    }
+                    // Because some messages could be dropped from the queue,
+                    // loops without a command can happen until all the permits are acquired.
+                    boolean timedOut = !semaphore.tryAcquire(config.repeatDelayMillis, TimeUnit.MILLISECONDS);
+                    // there were no new messages in a given timeout
+                    if (timedOut) {
+                        if (command != null && commandRepeated < config.repeatCommandTimes) {
+                            logger.debug("Repeating last command ...");
+                            sendQueue.add(command);
+                            commandRepeated++;
+                        } else {
+                            logger.debug("Waiting for new command ...");
+                            semaphore.acquire();
+                            logger.debug("New command received.");
+                            commandRepeated = 0;
+                        }
+                    } else {
+                        // new command received
+                        commandRepeated = 0;
+                    }
+                } catch (Throwable e) {
+                    logger.error("Cannot process command.", e);
+                }
+            }
+        });
     }
 
     public void connect() throws IOException {
@@ -62,8 +108,8 @@ public class Bulb implements Closeable {
         try {
             lastPower = on;
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("20", on));
-            send(byteBuffer, true);
-        } catch (PayloadGenerationException | IOException e) {
+            send(new Command(byteBuffer, "power"), true);
+        } catch (PayloadGenerationException e) {
             logger.error("Cannot set power on bulb: " + name, e);
         }
     }
@@ -75,8 +121,8 @@ public class Bulb implements Closeable {
         try {
             var value = 10 + (1000 - 10) * percentage / 100;
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("22", value));
-            send(byteBuffer);
-        } catch (PayloadGenerationException | IOException e) {
+            send(new Command(byteBuffer, "brightness"));
+        } catch (PayloadGenerationException e) {
             logger.error("Cannot set brightness on bulb: " + name, e);
         }
     }
@@ -91,8 +137,8 @@ public class Bulb implements Closeable {
         }
         try {
             ByteBuffer byteBuffer = generatePayload(Collections.singletonMap("23", relativeValue));
-            send(byteBuffer);
-        } catch (PayloadGenerationException | IOException e) {
+            send(new Command(byteBuffer, "temperature"));
+        } catch (PayloadGenerationException e) {
             logger.error("Cannot set temperature on bulb: " + name, e);
         }
     }
@@ -106,8 +152,8 @@ public class Bulb implements Closeable {
         command.put("24", colorValue);
         try {
             ByteBuffer colorBuffer = generatePayload(command);
-            send(colorBuffer);
-        } catch (PayloadGenerationException | IOException e) {
+            send(new Command(colorBuffer, "color"));
+        } catch (PayloadGenerationException e) {
             logger.error("Cannot set color on bulb: " + name, e);
         }
     }
@@ -205,15 +251,16 @@ public class Bulb implements Closeable {
         return tuyaMessage;
     }
 
-    private void send(ByteBuffer byteBuffer, boolean ignoreAlwaysSendPower) throws IOException {
+    private void send(Command command) {
+        send(command, false);
+    }
+
+    private void send(Command command, boolean ignoreAlwaysSendPower) {
         if (alwaysSendPower && !ignoreAlwaysSendPower) {
             setPower(lastPower);
         }
-        connection.send(byteBuffer);
-    }
-
-    private void send(ByteBuffer byteBuffer) throws IOException {
-        send(byteBuffer, false);
+        sendQueue.add(command);
+        semaphore.release();
     }
 
     @Override
@@ -226,5 +273,7 @@ public class Bulb implements Closeable {
             }
         }
     }
+
+    private record Command (ByteBuffer byteBuffer, String message) {}
 
 }

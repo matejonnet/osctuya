@@ -20,4 +20,12 @@ public class Config {
     public final boolean alwaysSendPower;
 
     public final List<BulbConfig> bulbs;
+
+    public final int sendQueueSize;
+
+    public final long commandTimeoutMillis;
+
+    public final long repeatDelayMillis;
+
+    public final int repeatCommandTimes;
 }

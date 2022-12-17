@@ -45,21 +45,7 @@ public class Connection implements Closeable {
         logger.debug("Connected to {}.", address);
     }
 
-    public void send(ByteBuffer buffer) throws IOException {
-        if (sending) {
-            // the connection might be unstable and blocking while trying to connect
-            logger.warn("Ignoring message: still sending previous one.");
-            return;
-        }
-        sending = true;
-        try {
-            doSendToOutputStream(buffer);
-        } finally {
-            sending = false;
-        }
-    }
-
-    private void doSendToOutputStream(ByteBuffer buffer) throws IOException {
+    public synchronized void send(ByteBuffer buffer) throws IOException {
         logger.debug("Sending to {} : {} ...", address, bytesToHex(buffer.array()));
         try {
             outputStream.write(buffer.array());

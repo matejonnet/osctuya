@@ -25,6 +25,7 @@ public class ExecutorPerBulbCommandScheduler implements CommandScheduler {
 
     private ExecutorService newBulbExecutor(int capacity) {
 
+        // not good to drop old messages as it might be a color change and we lose the data of the individual color
         BlockingQueue<Runnable> queue = new ArrayBlockingQueue<>(capacity) {
             Lock lock = new ReentrantLock(true);
             public boolean offer(Runnable e) {
