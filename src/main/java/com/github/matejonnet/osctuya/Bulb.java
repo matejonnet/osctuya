@@ -5,11 +5,6 @@ import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.SecretKeySpec;
 import java.awt.*;
 import java.io.Closeable;
 import java.io.IOException;
@@ -22,8 +17,18 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * @author <a href="mailto:matejonnet@gmail.com">Matej Lazar</a>
@@ -42,9 +47,10 @@ public class Bulb implements Closeable {
     private boolean lastPower;
     private CircularFifoQueue<Command> sendQueue;
     private Semaphore semaphore = new Semaphore(0);
-    private final ExecutorService executor = Executors.newScheduledThreadPool(1);
+    private final ExecutorService executor = Executors.newScheduledThreadPool(2);
     private ScheduledExecutorService cancelMonitor = Executors.newScheduledThreadPool(1);
     private int commandRepeated = 0;
+    private boolean logResponse;
 
     public Bulb(String ip, String devId, String localKey, String name, Config config) {
         this.ip = ip;
@@ -52,6 +58,7 @@ public class Bulb implements Closeable {
         this.localKey = localKey;
         this.name = name;
         this.alwaysSendPower = config.alwaysSendPower;
+        this.logResponse = config.logResponse;
 
         sendQueue = new CircularFifoQueue<>(config.sendQueueSize);
 
@@ -59,6 +66,7 @@ public class Bulb implements Closeable {
             while (true) {
                 try {
                     Command command = sendQueue.poll();
+                    logger.debug("Command {}.", command);
                     if (command != null) {
                         Future<?> future = executor.submit(() -> {
                             try {
@@ -96,7 +104,7 @@ public class Bulb implements Closeable {
     }
 
     public void connect() throws IOException {
-        connection = new Connection(ip);
+        connection = new Connection(ip, logResponse);
         connection.connect();
     }
 

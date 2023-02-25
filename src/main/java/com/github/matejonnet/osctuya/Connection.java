@@ -9,7 +9,9 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 import static com.github.matejonnet.osctuya.Utils.bytesToHex;
@@ -26,23 +28,25 @@ public class Connection implements Closeable {
 
     private Socket clientSocket;
     OutputStream outputStream;
-    private boolean sending;
+    private boolean logResponse;
 
-    public Connection(String ip) {
+    public Connection(String ip, boolean logResponse) {
         address = new InetSocketAddress(ip, PORT);
+        this.logResponse = logResponse;
     }
 
     public void connect() throws IOException {
-        connect(1000);
+        connect(1000); //TODO configurable
     }
 
     public void connect(int timeoutMillis) throws IOException {
-        logger.info("Connecting to {} ...", address);
+        logger.debug("Connecting to {} ...", address);
         clientSocket = new Socket();
         clientSocket.setKeepAlive(true);
         clientSocket.connect(address, timeoutMillis);
+        clientSocket.setSoTimeout(300);
         outputStream = clientSocket.getOutputStream();
-        logger.debug("Connected to {}.", address);
+        logger.info("Connected to {}.", address);
     }
 
     public synchronized void send(ByteBuffer buffer) throws IOException {
@@ -50,6 +54,15 @@ public class Connection implements Closeable {
         try {
             outputStream.write(buffer.array());
             outputStream.flush();
+//            close();
+            if (logResponse) {
+                try {
+                    String response = new String(clientSocket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                    logger.info("Response from {}: {}.", address, response);
+                } catch (SocketTimeoutException e) {
+                    logger.warn("Unable to read from " +  address  + ".", e.getMessage());
+                }
+            }
         } catch (Exception e) {
             logger.info("Retrying to {} because: {} ...", address, e.getMessage());
             retry(buffer, Instant.now().plusMillis(200));
@@ -59,7 +72,7 @@ public class Connection implements Closeable {
     private void retry(ByteBuffer buffer, Instant retryUntil) throws IOException {
         try {
             close();
-            connect(100);
+            connect(300); //TODO configurable
             outputStream.write(buffer.array());
             outputStream.flush();
         } catch (Exception ex) {

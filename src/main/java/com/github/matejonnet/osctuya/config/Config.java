@@ -28,4 +28,9 @@ public class Config {
     public final long repeatDelayMillis;
 
     public final int repeatCommandTimes;
+
+    /**
+     * Read and log response sent from the Bulbs.
+     */
+    public final boolean logResponse;
 }
