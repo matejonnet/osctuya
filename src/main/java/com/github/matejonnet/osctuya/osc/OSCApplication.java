@@ -55,7 +55,7 @@ public class OSCApplication extends OSCPortIn {
         startListening();
         log.info("# Listening for OSC Packets via {} ...", getTransport());
 
-        bulbsWithAddresses.parallelStream().forEach(bulbWithAddresses -> {
+        bulbsWithAddresses.stream().forEach(bulbWithAddresses -> {
             try {
                 bulbWithAddresses.getBulb().connect();
             } catch (IOException e) {

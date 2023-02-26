@@ -104,7 +104,8 @@ public class Bulb implements Closeable {
     }
 
     public void connect() throws IOException {
-        connection = new Connection(ip, logResponse);
+//        connection = new Connection(ip, logResponse, bytes -> decrypt(bytes));
+        connection = new Connection(ip, logResponse, getName());
         connection.connect();
     }
 
@@ -248,6 +249,7 @@ public class Bulb implements Closeable {
         tuyaMessage.put(8, HexFormat.of().parseHex("00000007"));
         // Add message size
         tuyaMessage.put(12, Utils.intToHexArray(payloadBuffer.capacity() + 8));
+//        tuyaMessage.put(12, Utils.intToHexArray(payloadBuffer.capacity()));
 
         // Add payload, crc, and suffix
         tuyaMessage.put(16, payloadBuffer.array());
@@ -269,6 +271,17 @@ public class Bulb implements Closeable {
         }
         sendQueue.add(command);
         semaphore.release();
+    }
+
+    private String decrypt(byte[] bytes) {
+        try {
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(localKey.getBytes(StandardCharsets.UTF_8), "AES"));
+            return new String(cipher.doFinal(bytes), StandardCharsets.UTF_8);
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
+            logger.error("Cannot decrypt message.", e);
+            return ""; //TODO
+        }
     }
 
     @Override
