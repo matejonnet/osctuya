@@ -5,6 +5,7 @@ import com.github.matejonnet.osctuya.config.BulbConfig;
 import com.github.matejonnet.osctuya.config.Config;
 import com.github.matejonnet.osctuya.config.ConfigReader;
 import com.github.matejonnet.osctuya.config.OscAddress;
+import com.github.matejonnet.osctuya.osc.schedulers.DirectCommandScheduler;
 import com.illposed.osc.OSCBadDataEvent;
 import com.illposed.osc.OSCBadDataListener;
 import com.illposed.osc.OSCMessageListener;
@@ -55,7 +56,7 @@ public class OSCApplication extends OSCPortIn {
         startListening();
         log.info("# Listening for OSC Packets via {} ...", getTransport());
 
-        bulbsWithAddresses.parallelStream().forEach(bulbWithAddresses -> {
+        bulbsWithAddresses.stream().forEach(bulbWithAddresses -> {
             try {
                 bulbWithAddresses.getBulb().connect();
             } catch (IOException e) {

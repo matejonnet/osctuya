@@ -1,18 +1,16 @@
-package com.github.matejonnet.osctuya.osc;
+package com.github.matejonnet.osctuya.osc.schedulers;
 
+import com.github.matejonnet.osctuya.osc.BulbCommand;
+import com.github.matejonnet.osctuya.osc.BulbCommandProcessor;
+import com.github.matejonnet.osctuya.osc.CommandScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 public class DirectCommandScheduler implements CommandScheduler {
 
     public static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-    private final Executor executor = Executors.newScheduledThreadPool(4);
-
 
     private final BulbCommandProcessor bulbCommandProcessor = new BulbCommandProcessor();
 

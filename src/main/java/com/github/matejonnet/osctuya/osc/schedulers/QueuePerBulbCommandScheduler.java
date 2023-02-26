@@ -1,5 +1,8 @@
-package com.github.matejonnet.osctuya.osc;
+package com.github.matejonnet.osctuya.osc.schedulers;
 
+import com.github.matejonnet.osctuya.osc.BulbCommand;
+import com.github.matejonnet.osctuya.osc.BulbCommandProcessor;
+import com.github.matejonnet.osctuya.osc.CommandScheduler;
 import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

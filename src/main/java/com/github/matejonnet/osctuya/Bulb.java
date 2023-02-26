@@ -19,10 +19,7 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -47,10 +44,7 @@ public class Bulb implements Closeable {
     private boolean lastPower;
     private CircularFifoQueue<Command> sendQueue;
     private Semaphore semaphore = new Semaphore(0);
-    private final ExecutorService executor = Executors.newScheduledThreadPool(2);
-    private ScheduledExecutorService cancelMonitor = Executors.newScheduledThreadPool(1);
-    private int commandRepeated = 0;
-    private boolean logResponse;
+    private final ExecutorService executor = Executors.newScheduledThreadPool(1);
 
     public Bulb(String ip, String devId, String localKey, String name, Config config) {
         this.ip = ip;
@@ -58,43 +52,20 @@ public class Bulb implements Closeable {
         this.localKey = localKey;
         this.name = name;
         this.alwaysSendPower = config.alwaysSendPower;
-        this.logResponse = config.logResponse;
 
         sendQueue = new CircularFifoQueue<>(config.sendQueueSize);
 
         executor.execute(() -> {
+            Command command = null;
             while (true) {
                 try {
-                    Command command = sendQueue.poll();
+                    if (command == null) {
+                        semaphore.acquire();
+                    }
+                    command = sendQueue.poll();
                     logger.debug("Command {}.", command);
                     if (command != null) {
-                        Future<?> future = executor.submit(() -> {
-                            try {
-                                connection.send(command.byteBuffer());
-                            } catch (IOException e) {
-                                logger.error("Cannot set " + command.message() + " on bulb: " + name, e);
-                            }
-                        });
-                        cancelMonitor.schedule(() -> future.cancel(true), config.commandTimeoutMillis, TimeUnit.MILLISECONDS);
-                    }
-                    // Because some messages could be dropped from the queue,
-                    // loops without a command can happen until all the permits are acquired.
-                    boolean timedOut = !semaphore.tryAcquire(config.repeatDelayMillis, TimeUnit.MILLISECONDS);
-                    // there were no new messages in a given timeout
-                    if (timedOut) {
-                        if (command != null && commandRepeated < config.repeatCommandTimes) {
-                            logger.debug("Repeating last command ...");
-                            sendQueue.add(command);
-                            commandRepeated++;
-                        } else {
-                            logger.debug("Waiting for new command ...");
-                            semaphore.acquire();
-                            logger.debug("New command received.");
-                            commandRepeated = 0;
-                        }
-                    } else {
-                        // new command received
-                        commandRepeated = 0;
+                        connection.send(command.byteBuffer());
                     }
                 } catch (Throwable e) {
                     logger.error("Cannot process command.", e);
@@ -104,7 +75,7 @@ public class Bulb implements Closeable {
     }
 
     public void connect() throws IOException {
-        connection = new Connection(ip, logResponse);
+        connection = new ChannelConnection(ip, getName());
         connection.connect();
     }
 
